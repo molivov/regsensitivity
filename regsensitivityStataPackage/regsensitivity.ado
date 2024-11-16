@@ -1,4 +1,4 @@
-*! version 1.1.0 Paul Diegert, Matt Masten, Alex Poirier 1aug2022
+*! version 1.1.0 Paul Diegert, Matt Masten, Alex Poirier 1aug2022, with support for pweights
 
 ********************************************************************************
 ** PROGRAM: Regression Sensivitity
