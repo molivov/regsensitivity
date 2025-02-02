@@ -20,6 +20,7 @@
 {it:{help varname:depvar}} {it:{help varname:indepvar}}
 {it:{help varlist:controls}}
 {ifin}
+{weight}
 [,{it:{help regsensitivity_bounds##analysis:analysis}} 
 {it:{help regsensitivity_bounds##options:options}}]
 

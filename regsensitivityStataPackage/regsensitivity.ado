@@ -1,4 +1,4 @@
-*! version 1.2.0 Paul Diegert, Matt Masten, Alex Poirier 29sept24
+*! version 1.2.0 Paul Diegert, Matt Masten, Alex Poirier 29sept24, with support for pweights
 
 ********************************************************************************
 ** PROGRAM: Regression Sensivitity
@@ -153,7 +153,7 @@ end
 
 program define load_dgp
 
-	syntax varlist (fv ts) [if] [in], [compare(varlist fv ts) nocompare(varlist fv ts) *]
+	syntax varlist (fv ts) [if] [in] [pw], [compare(varlist fv ts) nocompare(varlist fv ts) *]
 
 	tempfile active_data
 	
@@ -161,6 +161,15 @@ program define load_dgp
 	
 	marksample touse
 	quietly keep if `touse'
+	
+	if "`weight'" != "" {
+		tempvar wvar
+		gen double `wvar' `exp' if `touse'
+	}
+	else {
+		tempvar wvar
+		gen byte `wvar' = 1 if `touse'
+	}
 	
 	local y: word 1 of `varlist'
 	local x: word 2 of `varlist'
@@ -188,7 +197,7 @@ program define load_dgp
 
 	// Project (Y,X,W1) and replace variables with the residual.
 	foreach v of local yxw1 {
-		quietly regress `v' `w0'
+		quietly regress `v' `w0' [`weight'`exp']
 		quietly predict `v'r, resid
 		quietly replace `v' = `v'r
 		quietly drop `v'r
@@ -198,7 +207,7 @@ program define load_dgp
 	local w1expanded : list yxw1 - y
 	local w1expanded : list w1expanded - x
 	
-	mata: sig = get_dgp("`y'", "`x'", "`w1expanded'")
+	mata: sig = get_dgp("`y'", "`x'", "`w1expanded'", "`wvar'")
 	scalar nobs = _N
 	
 	quietly use `active_data', clear
@@ -207,7 +216,7 @@ end
 
 program define summary
 
-	syntax varlist (fv ts) [if] [in], [compare(varlist fv ts) ///
+	syntax varlist (fv ts) [if] [in] [pw], [compare(varlist fv ts) ///
 			nocompare(varlist fv ts)]
 		
 	di
@@ -265,7 +274,7 @@ end
 
 program define bounds, eclass
 
-	syntax varlist (fv ts) [if] [in], [compare(varlist fv ts)	///
+	syntax varlist (fv ts) [if] [in] [pw], [compare(varlist fv ts) ///
 			nocompare(varlist fv ts) 			///
 			oster dmp 					///
 			Cbar(string) RXbar(string) RYbar(string)	///
@@ -883,7 +892,7 @@ end
 
 program define breakdown, eclass
 
-	syntax varlist (fv ts) [if] [in], [compare(varlist fv ts) ///
+	syntax varlist (fv ts) [if] [in] [pw], [compare(varlist fv ts) ///
 			nocompare(varlist fv ts) ///
 			beta(string) maxovb(string) ///
 			oster dmp ///
@@ -1716,7 +1725,8 @@ struct dgp{
 struct dgp scalar get_dgp(
 	string scalar yname,
 	string scalar xname,
-	string scalar wname
+	string scalar wname,
+	string scalar weightname
 ){
 	
 	real matrix y, x, w, vw, v
@@ -1727,12 +1737,13 @@ struct dgp scalar get_dgp(
 	y = st_data(., yname)
 	x = st_data(., xname)
 	w = st_data(., wname)
+	weight = st_data(., weightname)
 	
 	// Remove constants
 	// (The variance matrix of W1 needs to have full rank, which will fail if we
 	//  try to calculate the variance matrix with a constant. A constant should
 	//  always be included in W0)
-	vw = variance(w)
+	vw = variance(w, weight)
 	for (i=rows(vw)-1; i >= 2; i = i - 1){
 		if (vw[i,i] == 0) {
 			imin = max((1, i-1))
@@ -1751,7 +1762,7 @@ struct dgp scalar get_dgp(
 	data = (y, x, w)
 	
 	// calcaulte the variance
-	v = variance(data)
+	v = variance(data, weight)
 	
 	// save sufficient parameters
 	s.var_y = v[1, 1]
